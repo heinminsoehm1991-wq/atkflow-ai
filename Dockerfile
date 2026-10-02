@@ -2,7 +2,7 @@ FROM python:3.12-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg \
     && rm -rf /var/lib/apt/lists/* \
-    && pip install --no-cache-dir "yt-dlp[default,curl-cffi]"
+    && pip install --no-cache-dir --upgrade --pre "yt-dlp[default,curl-cffi]"
 
 WORKDIR /app
 COPY server.py .
