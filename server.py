@@ -3,6 +3,8 @@
 import hmac
 import json
 import os
+import re
+import sys
 import subprocess
 import tempfile
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -71,10 +73,13 @@ class Handler(BaseHTTPRequestHandler):
                            "--output", output, "--", url]
                 try:
                     result = subprocess.run(command, stdout=subprocess.DEVNULL,
-                                            stderr=subprocess.DEVNULL, timeout=150, check=False)
+                                            stderr=subprocess.PIPE, text=True, timeout=150, check=False)
                 except subprocess.TimeoutExpired:
                     return self.reply(504, "TikTok download timed out")
                 if result.returncode != 0:
+                    diagnostic = re.sub(r"https?://[^\s]+", "[URL]", result.stderr or "")
+                    diagnostic = diagnostic.replace(secret, "[REDACTED]")[-4000:]
+                    print("ATK_IMPORT_FAILED: " + diagnostic, file=sys.stderr, flush=True)
                     return self.reply(422, "TikTok video unavailable for import")
                 videos = list(Path(directory).glob("video.mp4"))
                 if not videos:
