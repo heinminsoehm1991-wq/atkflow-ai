@@ -93,7 +93,8 @@ def download_source(url, folder, progress):
             return 'Live streams are not supported.'
         return None
     options = {
-        'format': 'bestvideo[height<=720]+bestaudio/best[height<=720]',
+        'format': 'bestvideo[height<=720]+bestaudio/best[height<=720]/bestvideo+bestaudio/best',
+        'compat_opts': {'no-certifi'},
         'merge_output_format': 'mp4', 'outtmpl': str(folder / 'source.%(ext)s'),
         'noplaylist': True, 'quiet': True, 'logger': Quiet(), 'socket_timeout': 30,
         'retries': 1, 'fragment_retries': 1, 'max_filesize': 512 * 1024 * 1024,
