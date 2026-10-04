@@ -342,7 +342,7 @@ WrapStyle: 0
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,{font},{size},{ass_color(options['text_color'])},&H00FFFFFF,&H00000000,{ass_color(options['background_color'])},{-1 if options['bold'] else 0},0,0,0,100,100,0,0,3,2,0,2,20,20,20,1
+Style: Default,{font},{size},{ass_color(options['text_color'])},&H00FFFFFF,{ass_color(options['background_color'])},{ass_color(options['background_color'])},{-1 if options['bold'] else 0},0,0,0,100,100,0,0,3,2,0,2,20,20,20,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
