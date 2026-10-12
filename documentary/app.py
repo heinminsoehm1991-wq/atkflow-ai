@@ -21,7 +21,9 @@ async def auth(req:Request,next_call):
  return await next_call(req)
 @app.get("/health")
 def health():return {"status":"ok"}
-HTML="""<!doctype html><html lang="my"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ATK AI Documentary Studio</title><style>body{font:16px system-ui;background:#0c1424;color:#edf4ff;margin:0}main{max-width:760px;margin:auto;padding:22px}section{background:#1b2a42;padding:20px;border-radius:14px;margin:18px 0}input,textarea,button{box-sizing:border-box;width:100%;margin:8px 0;padding:12px;border-radius:8px;border:1px solid #63738c;background:#101c30;color:white}button{background:#2669dd;cursor:pointer}a{color:#9bc7ff}small{color:#a9b9ce}</style><main><h1>ATK AI Documentary Studio</h1><small>Online browser MVP · Myanmar male voice · 1080p MP4</small><section><h3>1. ဇာတ်ညွှန်း / Voice</h3><textarea id="script" rows="7" placeholder="မြန်မာ ဇာတ်ညွှန်း (စာကြောင်းတစ်ကြောင်း = subtitle တစ်ခု)"></textarea><button onclick="preview()">မြန်မာ အမျိုးသားအသံ Preview</button><audio id="audio" controls style="width:100%"></audio><label>ကိုယ်ပိုင် Voice ဖိုင် (optional)</label><input id="voice" type="file" accept="audio/*"></section><section><h3>2. Scene Video / BGM</h3><input id="videos" type="file" multiple accept="video/*"><label>BGM (optional)</label><input id="music" type="file" accept="audio/*"><small>အချိန်ညှိ Scene Editing ဖြစ်ပြီး AI semantic scene selection မဟုတ်သေးပါ။</small></section><section><h3>3. 1080p Export</h3><button onclick="render()">Render MP4 + SRT</button><p id="status">Ready</p><div id="links"></div></section></main><script>
+HTML="""<!doctype html><html lang="my"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ATK AI Documentary Studio</title><style>body{font:16px system-ui;background:#0c1424;color:#edf4ff;margin:0}main{max-width:760px;margin:auto;padding:22px}section{background:#1b2a42;padding:20px;border-radius:14px;margin:18px 0}input,textarea,button{box-sizing:border-box;width:100%;margin:8px 0;padding:12px;border-radius:8px;border:1px solid #63738c;background:#101c30;color:white}button{background:#2669dd;cursor:pointer}a{color:#9bc7ff}small{color:#a9b9ce}</style><main><h1>ATK AI Documentary Studio</h1><small>Online browser MVP · Myanmar male voice · 1080p MP4</small><section><h3>0. YouTube Reference</h3><small>မူရင်း YouTube Video ကို Download မလုပ်ပါ။ ခေါင်းစဉ်နဲ့ Channel အချက်အလက်ကိုသာ ဖတ်ပြီး ကိုယ်ပိုင် Documentary စီစဉ်ရန် အသုံးပြုပါ။</small><input id="youtube" type="url" placeholder="https://www.youtube.com/watch?v=..."><button onclick="reference()">YouTube Link စစ်ဆေးရန်</button><p id="refstatus"></p><label>ကိုယ်ပိုင် မှတ်စု / အသုံးပြုခွင့်ရှိသော Transcript</label><textarea id="notes" rows="4" placeholder="လေ့လာထားတဲ့ အချက်အလက်တွေကို ဒီမှာရေးပါ"></textarea><button onclick="outline()">မြန်မာ Documentary Script မူကြမ်း ပြုလုပ်ရန်</button><small>ယခုအဆင့်မှာ AI Research မဟုတ်သေးပါ။ သင့်မှတ်စုကနေ စီစဉ်ထားတဲ့ Template မူကြမ်းသာ ထုတ်ပေးပါတယ်။</small></section><section><h3>1. ဇာတ်ညွှန်း / Voice</h3><textarea id="script" rows="7" placeholder="မြန်မာ ဇာတ်ညွှန်း (စာကြောင်းတစ်ကြောင်း = subtitle တစ်ခု)"></textarea><button onclick="preview()">မြန်မာ အမျိုးသားအသံ Preview</button><audio id="audio" controls style="width:100%"></audio><label>ကိုယ်ပိုင် Voice ဖိုင် (optional)</label><input id="voice" type="file" accept="audio/*"></section><section><h3>2. Scene Video / BGM</h3><input id="videos" type="file" multiple accept="video/*"><label>BGM (optional)</label><input id="music" type="file" accept="audio/*"><small>အချိန်ညှိ Scene Editing ဖြစ်ပြီး AI semantic scene selection မဟုတ်သေးပါ။</small></section><section><h3>3. 1080p Export</h3><button onclick="render()">Render MP4 + SRT</button><p id="status">Ready</p><div id="links"></div></section></main><script>
+async function reference(){const el=document.querySelector('#refstatus');el.textContent='Checking public metadata...';try{const r=await fetch('/youtube-reference',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url:document.querySelector('#youtube').value})});const d=await r.json();if(!r.ok)throw Error(d.detail);el.textContent='Title: '+d.title+' | Channel: '+d.author+' | Video footage မယူထားပါ';}catch(e){el.textContent='Error: '+e.message;}}
+function outline(){const notes=document.querySelector('#notes').value.trim();if(!notes){alert('ကိုယ်ပိုင် မှတ်စုကို အရင်ထည့်ပါ');return}const title=document.querySelector('#refstatus').textContent.split(' | ')[0].replace('Title: ','')||'ဒီအကြောင်းအရာ';document.querySelector('#script').value='ဒီနေ့မှာတော့ '+title+' နဲ့ ဆက်စပ်တဲ့ အကြောင်းအရာကို လေ့လာကြည့်ကြရအောင်။\\n'+notes.split('\\n').map(x=>x.trim()).filter(Boolean).join('\\n')+'\\nအထက်ပါအချက်အလက်တွေကို မူရင်းရင်းမြစ်တွေနဲ့ ပြန်လည်စစ်ဆေးပြီးမှ အသံထုတ်ပါ။';document.querySelector('#status').textContent='Template draft ready — အချက်အလက်စစ်ဆေးပြီး ကိုယ်ပိုင်စကားပြောပုံစံ ပြန်ရေးပါ';}
 async function preview(){let f=new FormData();f.append('script',document.querySelector('#script').value.slice(0,400));document.querySelector('#status').textContent='Voice generating...';try{let r=await fetch('/tts',{method:'POST',body:f});if(!r.ok)throw Error((await r.json()).detail);document.querySelector('#audio').src=URL.createObjectURL(await r.blob());document.querySelector('#status').textContent='Preview ready'}catch(e){document.querySelector('#status').textContent=e.message}}
 async function render(){let f=new FormData();let videos=document.querySelector('#videos').files;if(!videos.length)return alert('Video ထည့်ပါ');for(let v of videos)f.append('videos',v);let voice=document.querySelector('#voice').files[0],music=document.querySelector('#music').files[0];if(voice)f.append('voice',voice);if(music)f.append('music',music);f.append('script',document.querySelector('#script').value);document.querySelector('#status').textContent='Rendering...';try{let r=await fetch('/render',{method:'POST',body:f});let d=await r.json();if(!r.ok)throw Error(d.detail);document.querySelector('#links').innerHTML='<a href="'+d.mp4+'">MP4 Download</a> | <a href="'+d.srt+'">SRT Download</a>';document.querySelector('#status').textContent='Done'}catch(e){document.querySelector('#status').textContent='Error: '+e.message}}
 </script></html>"""
@@ -91,3 +93,29 @@ def download(job:str,filename:str):
  p=ROOT/job/filename
  if not p.exists():raise HTTPException(404)
  return FileResponse(p,filename=filename)
+
+# Public YouTube metadata only; no video download or transcript scraping.
+from pydantic import BaseModel
+from urllib.parse import urlparse,parse_qs
+from urllib.request import Request as URLRequest, urlopen
+import json,re
+class YouTubeReference(BaseModel):
+ url:str
+@app.post("/youtube-reference")
+def youtube_reference(item:YouTubeReference):
+ if len(item.url)>500:raise HTTPException(400,"URL too long")
+ u=urlparse(item.url.strip())
+ host=(u.hostname or "").lower()
+ if u.scheme!="https" or host not in ("youtube.com","www.youtube.com","m.youtube.com","youtu.be"):
+  raise HTTPException(400,"HTTPS YouTube link only")
+ if host=="youtu.be":vid=u.path.strip("/").split("/")[0]
+ elif u.path=="/watch":vid=parse_qs(u.query).get("v",[""])[0]
+ elif u.path.startswith(("/shorts/","/live/","/embed/")):vid=u.path.split("/")[2]
+ else:raise HTTPException(400,"Unsupported YouTube URL format")
+ if not re.fullmatch(r"[A-Za-z0-9_-]{11}",vid):raise HTTPException(400,"Invalid video ID")
+ safe="https://www.youtube.com/watch?v="+vid
+ try:
+  req=URLRequest("https://www.youtube.com/oembed?url="+safe+"&format=json",headers={"User-Agent":"ATKDocumentaryStudio/1.0"})
+  with urlopen(req,timeout=8) as resp:data=json.loads(resp.read(12000))
+ except Exception:raise HTTPException(502,"YouTube metadata unavailable. Paste notes manually.")
+ return {"video_url":safe,"title":str(data.get("title",""))[:300],"author":str(data.get("author_name",""))[:200],"downloaded":False}
