@@ -64,7 +64,7 @@ async def tts(text,path):
   if len(pieces)==1:shutil.move(str(pieces[0]),str(path))
   else:
    concat=path.parent/"tts_concat.txt"
-   concat.write_text("".join("file '"+p.name+"'\\n" for p in pieces),encoding="utf-8")
+   concat.write_text("".join("file '"+p.name+"'\n" for p in pieces),encoding="utf-8")
    run(["ffmpeg","-y","-f","concat","-safe","0","-i",str(concat),"-c:a","libmp3lame","-q:a","4",str(path)])
  except HTTPException:raise
  except Exception as e:raise HTTPException(502,"TTS unavailable: "+str(e)[:120])
