@@ -21,9 +21,9 @@ async def auth(req:Request,next_call):
  return await next_call(req)
 @app.get("/health")
 def health():return {"status":"ok"}
-HTML="""<!doctype html><html lang="my"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ATK AI Documentary Studio</title><style>body{font:16px system-ui;background:#0c1424;color:#edf4ff;margin:0}main{max-width:760px;margin:auto;padding:22px}section{background:#1b2a42;padding:20px;border-radius:14px;margin:18px 0}input,textarea,button{box-sizing:border-box;width:100%;margin:8px 0;padding:12px;border-radius:8px;border:1px solid #63738c;background:#101c30;color:white}button{background:#2669dd;cursor:pointer}a{color:#9bc7ff}small{color:#a9b9ce}</style><main><h1>ATK AI Documentary Studio</h1><small>Online browser MVP · Myanmar male voice · 1080p MP4</small><section><h3>0. YouTube Reference</h3><small>မူရင်း YouTube Video ကို Download မလုပ်ပါ။ ခေါင်းစဉ်နဲ့ Channel အချက်အလက်ကိုသာ ဖတ်ပြီး ကိုယ်ပိုင် Documentary စီစဉ်ရန် အသုံးပြုပါ။</small><input id="youtube" type="url" placeholder="https://www.youtube.com/watch?v=..."><button onclick="reference()">YouTube Link စစ်ဆေးရန်</button><p id="refstatus"></p><label>ကိုယ်ပိုင် မှတ်စု / အသုံးပြုခွင့်ရှိသော Transcript</label><textarea id="notes" rows="4" placeholder="လေ့လာထားတဲ့ အချက်အလက်တွေကို ဒီမှာရေးပါ"></textarea><button onclick="outline()">မြန်မာ Documentary Script မူကြမ်း ပြုလုပ်ရန်</button><small>ယခုအဆင့်မှာ AI Research မဟုတ်သေးပါ။ သင့်မှတ်စုကနေ စီစဉ်ထားတဲ့ Template မူကြမ်းသာ ထုတ်ပေးပါတယ်။</small></section><section><h3>1. ဇာတ်ညွှန်း / Voice</h3><textarea id="script" rows="7" placeholder="မြန်မာ ဇာတ်ညွှန်း (စာကြောင်းတစ်ကြောင်း = subtitle တစ်ခု)"></textarea><button onclick="preview()">မြန်မာ အမျိုးသားအသံ Preview</button><audio id="audio" controls style="width:100%"></audio><label>ကိုယ်ပိုင် Voice ဖိုင် (optional)</label><input id="voice" type="file" accept="audio/*"></section><section><h3>2. Scene Video / BGM</h3><input id="videos" type="file" multiple accept="video/*"><label>BGM (optional)</label><input id="music" type="file" accept="audio/*"><small>အချိန်ညှိ Scene Editing ဖြစ်ပြီး AI semantic scene selection မဟုတ်သေးပါ။</small></section><section><h3>3. 1080p Export</h3><button onclick="render()">Render MP4 + SRT</button><p id="status">Ready</p><div id="links"></div></section></main><script>
+HTML="""<!doctype html><html lang="my"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ATK AI Documentary Studio</title><style>body{font:16px system-ui;background:#0c1424;color:#edf4ff;margin:0}main{max-width:760px;margin:auto;padding:22px}section{background:#1b2a42;padding:20px;border-radius:14px;margin:18px 0}input,textarea,button{box-sizing:border-box;width:100%;margin:8px 0;padding:12px;border-radius:8px;border:1px solid #63738c;background:#101c30;color:white}button{background:#2669dd;cursor:pointer}a{color:#9bc7ff}small{color:#a9b9ce}</style><main><h1>ATK AI Documentary Studio</h1><small>Online browser MVP · Myanmar male voice · 1080p MP4</small><section><h3>0. YouTube Reference</h3><small>မူရင်း YouTube Video ကို Download မလုပ်ပါ။ ခေါင်းစဉ်နဲ့ Channel အချက်အလက်ကိုသာ ဖတ်ပြီး ကိုယ်ပိုင် Documentary စီစဉ်ရန် အသုံးပြုပါ။</small><input id="youtube" type="url" placeholder="https://www.youtube.com/watch?v=..."><button onclick="reference()">YouTube Link စစ်ဆေးရန်</button><p id="refstatus"></p><label>ကိုယ်ပိုင် မှတ်စု / အသုံးပြုခွင့်ရှိသော Transcript</label><textarea id="notes" rows="4" placeholder="လေ့လာထားတဲ့ အချက်အလက်တွေကို ဒီမှာရေးပါ"></textarea><button onclick="outline()">Gemini AI ဖြင့် မြန်မာ Documentary Script ထုတ်ရန်</button><small>Gemini API ဖြင့် Link သို့မဟုတ် မှတ်စုကို လေ့လာပြီး မူရင်း မြန်မာဇာတ်ညွှန်း ဖန်တီးပါမည်။ AI အချက်အလက်များကို ပြန်လည်စစ်ဆေးပါ။</small></section><section><h3>1. ဇာတ်ညွှန်း / Voice</h3><textarea id="script" rows="7" placeholder="မြန်မာ ဇာတ်ညွှန်း (စာကြောင်းတစ်ကြောင်း = subtitle တစ်ခု)"></textarea><button onclick="preview()">မြန်မာ အမျိုးသားအသံ Preview</button><audio id="audio" controls style="width:100%"></audio><label>ကိုယ်ပိုင် Voice ဖိုင် (optional)</label><input id="voice" type="file" accept="audio/*"></section><section><h3>2. Scene Video / BGM</h3><input id="videos" type="file" multiple accept="video/*"><label>BGM (optional)</label><input id="music" type="file" accept="audio/*"><small>အချိန်ညှိ Scene Editing ဖြစ်ပြီး AI semantic scene selection မဟုတ်သေးပါ။</small></section><section><h3>3. 1080p Export</h3><button onclick="render()">Render MP4 + SRT</button><p id="status">Ready</p><div id="links"></div></section></main><script>
 async function reference(){const el=document.querySelector('#refstatus');el.textContent='Checking public metadata...';try{const r=await fetch('/youtube-reference',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url:document.querySelector('#youtube').value})});const d=await r.json();if(!r.ok)throw Error(d.detail);el.textContent='Title: '+d.title+' | Channel: '+d.author+' | Video footage မယူထားပါ';}catch(e){el.textContent='Error: '+e.message;}}
-function outline(){const notes=document.querySelector('#notes').value.trim();if(!notes){alert('ကိုယ်ပိုင် မှတ်စုကို အရင်ထည့်ပါ');return}const title=document.querySelector('#refstatus').textContent.split(' | ')[0].replace('Title: ','')||'ဒီအကြောင်းအရာ';document.querySelector('#script').value='ဒီနေ့မှာတော့ '+title+' နဲ့ ဆက်စပ်တဲ့ အကြောင်းအရာကို လေ့လာကြည့်ကြရအောင်။\\n'+notes.split('\\n').map(x=>x.trim()).filter(Boolean).join('\\n')+'\\nအထက်ပါအချက်အလက်တွေကို မူရင်းရင်းမြစ်တွေနဲ့ ပြန်လည်စစ်ဆေးပြီးမှ အသံထုတ်ပါ။';document.querySelector('#status').textContent='Template draft ready — အချက်အလက်စစ်ဆေးပြီး ကိုယ်ပိုင်စကားပြောပုံစံ ပြန်ရေးပါ';}
+async function outline(){const notes=document.querySelector('#notes').value.trim(),url=document.querySelector('#youtube').value.trim(),el=document.querySelector('#status'),btn=document.querySelector('button[onclick="outline()"]');if(!notes&&!url){alert('YouTube Link သို့မဟုတ် မှတ်စု ထည့်ပါ');return}btn.disabled=true;el.textContent='Gemini AI က မြန်မာဇာတ်ညွှန်း ရေးနေပါသည်...';try{const r=await fetch('/generate-script',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url,notes})});const d=await r.json();if(!r.ok)throw Error(d.detail||'Generation failed');document.querySelector('#script').value=d.script;el.textContent='Gemini Script ready — အချက်အလက်နှင့် မူပိုင်ခွင့်ကို စစ်ဆေးပါ';document.querySelector('#script').scrollIntoView({behavior:'smooth',block:'center'})}catch(e){el.textContent='Error: '+e.message}finally{btn.disabled=false}}
 async function preview(){let f=new FormData();f.append('script',document.querySelector('#script').value.slice(0,400));document.querySelector('#status').textContent='Voice generating...';try{let r=await fetch('/tts',{method:'POST',body:f});if(!r.ok)throw Error((await r.json()).detail);document.querySelector('#audio').src=URL.createObjectURL(await r.blob());document.querySelector('#status').textContent='Preview ready'}catch(e){document.querySelector('#status').textContent=e.message}}
 async function render(){let f=new FormData();let videos=document.querySelector('#videos').files;if(!videos.length)return alert('Video ထည့်ပါ');for(let v of videos)f.append('videos',v);let voice=document.querySelector('#voice').files[0],music=document.querySelector('#music').files[0];if(voice)f.append('voice',voice);if(music)f.append('music',music);f.append('script',document.querySelector('#script').value);document.querySelector('#status').textContent='Rendering...';try{let r=await fetch('/render',{method:'POST',body:f});let d=await r.json();if(!r.ok)throw Error(d.detail);document.querySelector('#links').innerHTML='<a href="'+d.mp4+'">MP4 Download</a> | <a href="'+d.srt+'">SRT Download</a>';document.querySelector('#status').textContent='Done'}catch(e){document.querySelector('#status').textContent='Error: '+e.message}}
 </script></html>"""
@@ -119,3 +119,48 @@ def youtube_reference(item:YouTubeReference):
   with urlopen(req,timeout=8) as resp:data=json.loads(resp.read(12000))
  except Exception:raise HTTPException(502,"YouTube metadata unavailable. Paste notes manually.")
  return {"video_url":safe,"title":str(data.get("title",""))[:300],"author":str(data.get("author_name",""))[:200],"downloaded":False}
+
+class ScriptRequest(BaseModel):
+ url:str=""
+ notes:str=""
+@app.post("/generate-script")
+def generate_script(item:ScriptRequest):
+ key=os.getenv("GEMINI_API_KEY","").strip()
+ if not key:raise HTTPException(503,"GEMINI_API_KEY ကို Render Environment မှာ ထည့်ပါ")
+ if len(item.notes)>25000 or len(item.url)>500:raise HTTPException(400,"Input too long")
+ url=item.url.strip()
+ if not url and not item.notes.strip():raise HTTPException(400,"YouTube Link သို့မဟုတ် မှတ်စု လိုအပ်ပါသည်")
+ parts=[]
+ if url:
+  u=urlparse(url)
+  host=(u.hostname or "").lower()
+  if u.scheme!="https" or host not in ("youtube.com","www.youtube.com","m.youtube.com","youtu.be"):
+   raise HTTPException(400,"HTTPS YouTube link only")
+  vid=u.path.strip("/").split("/")[0] if host=="youtu.be" else (parse_qs(u.query).get("v",[""])[0] if u.path=="/watch" else (u.path.split("/")[2] if u.path.startswith(("/shorts/","/live/","/embed/")) and len(u.path.split("/"))>2 else ""))
+  if not re.fullmatch(r"[A-Za-z0-9_-]{11}",vid):raise HTTPException(400,"Invalid YouTube video ID")
+  parts.append({"file_data":{"file_uri":"https://www.youtube.com/watch?v="+vid,"mime_type":"video/mp4"}})
+ prompt=("Write an ORIGINAL Burmese-language documentary narration script using only verifiable information from the provided video and/or user's notes. "
+ "Do not copy or closely paraphrase copyrighted narration. Do not pretend to have watched the video if it cannot be accessed. "
+ "If insufficient information, say what is missing instead of fabricating facts. "
+ "Use natural Myanmar male narrator style, compelling introduction, logical scene progression and conclusion. "
+ "Output ONLY Burmese narration, one short subtitle-friendly sentence per line. "
+ "Avoid unverified claims and indicate uncertainty when needed. "
+ "User notes:\n"+item.notes.strip())
+ parts.append({"text":prompt})
+ model=os.getenv("GEMINI_MODEL","gemini-2.5-flash")
+ payload={"contents":[{"role":"user","parts":parts}],"generationConfig":{"temperature":0.45,"maxOutputTokens":4096}}
+ try:
+  req=URLRequest("https://generativelanguage.googleapis.com/v1beta/models/"+model+":generateContent",data=json.dumps(payload).encode(),headers={"Content-Type":"application/json","x-goog-api-key":key},method="POST")
+  with urlopen(req,timeout=120) as response:data=json.loads(response.read(500000))
+  output="\n".join(p.get("text","") for c in data.get("candidates",[]) for p in c.get("content",{}).get("parts",[]) if p.get("text"))
+  if not output.strip():raise HTTPException(502,"Gemini returned no script. Try adding notes.")
+  return {"script":output.strip()}
+ except HTTPException:raise
+ except Exception as exc:
+  from urllib.error import HTTPError
+  if isinstance(exc,HTTPError):
+   code=exc.code
+   if url and not item.notes.strip() and code in (400,403,404,422):
+    raise HTTPException(422,"Gemini က ဒီ YouTube Video ကို ဖတ်မရပါ။ ကိုယ်ပိုင် မှတ်စု/Transcript ထည့်ပြီး ပြန်စမ်းပါ")
+   raise HTTPException(502,"Gemini API request failed (HTTP "+str(code)+"). Check API key, quota and video access.")
+  raise HTTPException(502,"Gemini service unavailable. Try again later.")
