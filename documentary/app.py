@@ -1,11 +1,12 @@
 import os, uuid, subprocess, asyncio, shutil
 from pathlib import Path
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Request
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Request, BackgroundTasks
 from fastapi.responses import HTMLResponse, FileResponse, Response, JSONResponse
 import secrets, base64
 import edge_tts
 app=FastAPI(title="ATK AI Documentary Studio")
 ROOT=Path("/tmp/atk_jobs");ROOT.mkdir(exist_ok=True)
+JOBS={}
 VOICE="my-MM-ThihaNeural"
 @app.middleware("http")
 async def auth(req:Request,next_call):
@@ -25,7 +26,7 @@ HTML="""<!doctype html><html lang="my"><meta charset="utf-8"><meta name="viewpor
 async function reference(){const el=document.querySelector('#refstatus');el.textContent='Checking public metadata...';try{const r=await fetch('/youtube-reference',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url:document.querySelector('#youtube').value})});const d=await r.json();if(!r.ok)throw Error(d.detail);el.textContent='Title: '+d.title+' | Channel: '+d.author+' | Video footage မယူထားပါ';}catch(e){el.textContent='Error: '+e.message;}}
 async function outline(){const notes=document.querySelector('#notes').value.trim(),url=document.querySelector('#youtube').value.trim(),el=document.querySelector('#scriptstatus'),btn=document.querySelector('button[onclick="outline()"]');if(!notes&&!url){alert('YouTube Link သို့မဟုတ် မှတ်စု ထည့်ပါ');return}btn.disabled=true;el.textContent='Gemini AI က မြန်မာဇာတ်ညွှန်း ရေးနေပါသည်...';try{const r=await fetch('/generate-script',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url,notes})});const d=await r.json();if(!r.ok)throw Error(d.detail||'Generation failed');document.querySelector('#script').value=d.script;el.textContent=d.warning||'Gemini Script ready — အချက်အလက်နှင့် မူပိုင်ခွင့်ကို စစ်ဆေးပါ';document.querySelector('#script').scrollIntoView({behavior:'smooth',block:'center'})}catch(e){el.textContent='Error: '+e.message}finally{btn.disabled=false}}
 async function preview(){const script=document.querySelector('#script').value.trim(),el=document.querySelector('#voicestatus'),btn=document.querySelector('#previewbtn');if(!script){el.textContent='မြန်မာ ဇာတ်ညွှန်း အရင်ထည့်ပါ';return}let f=new FormData();f.append('script',script.slice(0,400));btn.disabled=true;el.textContent='မြန်မာအသံ ထုတ်နေပါသည်...';try{let r=await fetch('/tts',{method:'POST',body:f});if(!r.ok){let d=await r.json().catch(()=>({}));throw Error(d.detail||'Voice generation failed')}let player=document.querySelector('#audio');if(player.dataset.objecturl)URL.revokeObjectURL(player.dataset.objecturl);player.dataset.objecturl=URL.createObjectURL(await r.blob());player.src=player.dataset.objecturl;el.textContent='အသံ Preview အဆင်သင့်ပါပြီ';await player.play().catch(()=>{})}catch(e){el.textContent='Voice Error: '+e.message}finally{btn.disabled=false}}
-async function render(){let f=new FormData();let videos=document.querySelector('#videos').files;if(!videos.length)return alert('Video ထည့်ပါ');for(let v of videos)f.append('videos',v);let voice=document.querySelector('#voice').files[0],music=document.querySelector('#music').files[0];if(voice)f.append('voice',voice);if(music)f.append('music',music);f.append('script',document.querySelector('#script').value);document.querySelector('#status').textContent='Rendering...';try{let r=await fetch('/render',{method:'POST',body:f});let d=await r.json();if(!r.ok)throw Error(d.detail);document.querySelector('#links').innerHTML='<a href="'+d.mp4+'">MP4 Download</a> | <a href="'+d.srt+'">SRT Download</a>';document.querySelector('#status').textContent='Done'}catch(e){document.querySelector('#status').textContent='Error: '+e.message}}
+async function render(){let f=new FormData(),videos=document.querySelector('#videos').files,status=document.querySelector('#status'),links=document.querySelector('#links');if(!videos.length){status.textContent='Video Scene အနည်းဆုံးတစ်ခု ထည့်ပါ';return}for(let v of videos)f.append('videos',v);let voice=document.querySelector('#voice').files[0],music=document.querySelector('#music').files[0];if(voice)f.append('voice',voice);if(music)f.append('music',music);f.append('script',document.querySelector('#script').value);status.textContent='Uploading and starting background render...';links.textContent='';try{let r=await fetch('/render',{method:'POST',body:f}),d=await r.json();if(!r.ok)throw Error(d.detail||'Render start failed');if(d.job){status.textContent='Background render started';for(let i=0;i<720;i++){await new Promise(resolve=>setTimeout(resolve,5000));let p=await fetch('/render-status/'+encodeURIComponent(d.job));if(!p.ok)throw Error('Cannot check render status');let state=await p.json();status.textContent='Render: '+state.status+(state.progress?' — '+state.progress:'');if(state.status==='done'){links.innerHTML='<a href="'+state.mp4+'">MP4 Download</a> | <a href="'+state.srt+'">SRT Download</a>';return}if(state.status==='failed')throw Error(state.error||'Render failed')}throw Error('Render is still running; check later')}else{links.innerHTML='<a href="'+d.mp4+'">MP4 Download</a> | <a href="'+d.srt+'">SRT Download</a>';status.textContent='Done'}}catch(e){status.textContent='Error: '+e.message}}
 </script></html>"""
 @app.get("/",response_class=HTMLResponse)
 def home():return HTML
@@ -79,7 +80,7 @@ def stamp(t):
  ms=round(t*1000);h,ms=divmod(ms,3600000);m,ms=divmod(ms,60000);s,ms=divmod(ms,1000)
  return f"{h:02}:{m:02}:{s:02},{ms:03}"
 @app.post("/render")
-async def render(videos:list[UploadFile]=File(...),script:str=Form(""),voice:UploadFile|None=File(None),music:UploadFile|None=File(None)):
+async def render(background_tasks:BackgroundTasks,videos:list[UploadFile]=File(...),script:str=Form(""),voice:UploadFile|None=File(None),music:UploadFile|None=File(None)):
  if not videos:raise HTTPException(400,"At least one video required")
  if len(videos)>12:raise HTTPException(400,"Trial supports 12 scenes max")
  folder=ROOT/uuid.uuid4().hex;folder.mkdir()
@@ -92,34 +93,58 @@ async def render(videos:list[UploadFile]=File(...),script:str=Form(""),voice:Upl
     dest.write(data)
   return path
  clips=[await save(v,folder/f"clip{i}{Path(v.filename or '.mp4').suffix}") for i,v in enumerate(videos)]
- if voice:audio=await save(voice,folder/"voice"+(Path(voice.filename or ".mp3").suffix.lower() if Path(voice.filename or ".mp3").suffix.lower() in (".mp3",".wav",".m4a",".aac") else ".mp3"))
- else:
-  audio=folder/"voice.mp3";await tts(script,audio)
- total=duration(audio)
- if total>7200:raise HTTPException(413,"Export currently limited to 120 minutes; split longer projects")
- if total<0.5:raise HTTPException(400,"Audio too short")
- if not clips:raise HTTPException(400,"At least one video required")
- each=total/len(clips)
- if each<=0:raise HTTPException(400,"Invalid scene duration")
- rendered=[]
- for i,clip in enumerate(clips):
-  out=folder/f"scene{i}.mp4"
-  run(["ffmpeg","-y","-stream_loop","-1","-i",str(clip),"-t",str(each),"-vf","scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2,setsar=1","-r","24","-an","-c:v","libx264","-threads","2","-preset","ultrafast","-crf","30",str(out)])
-  rendered.append(out)
- listing=folder/"concat.txt";listing.write_text("".join("file '"+p.name+"'\n" for p in rendered))
- silent=folder/"silent.mp4"
- run(["ffmpeg","-y","-f","concat","-safe","0","-i",str(listing),"-c","copy",str(silent)])
- srt=folder/"captions.srt";lines=[x.strip() for x in script.splitlines() if x.strip()]
- if not lines:lines=[" "]
- step=total/len(lines)
- srt.write_text("".join(f"{i+1}\n{stamp(i*step)} --> {stamp(min(total,(i+1)*step))}\n{line}\n\n" for i,line in enumerate(lines)),encoding="utf-8")
- final=folder/"documentary.mp4"
- if music:
-  bg=await save(music,folder/"bg.mp3")
-  run(["ffmpeg","-y","-i",str(silent),"-i",str(audio),"-stream_loop","-1","-i",str(bg),"-filter_complex","[1:a]volume=1[a];[2:a]volume=0.08[b];[a][b]amix=inputs=2:duration=first[m]","-map","0:v","-map","[m]","-t",str(total),"-c:v","copy","-c:a","aac",str(final)])
- else:run(["ffmpeg","-y","-i",str(silent),"-i",str(audio),"-t",str(total),"-c:v","copy","-c:a","aac",str(final)])
- key=folder.name
- return {"mp4":f"/download/{key}/documentary.mp4","srt":f"/download/{key}/captions.srt"}
+ voicepath=await save(voice,folder/"voice.mp3") if voice else None
+ musicpath=await save(music,folder/"bg.mp3") if music else None
+ job=folder.name
+ JOBS[job]={"status":"queued","progress":"Waiting for render"}
+ background_tasks.add_task(process_render,job,clips,script,voicepath,musicpath)
+ return {"job":job,"status":"queued"}
+
+async def process_render(job,clips,script,voicepath,musicpath):
+ folder=ROOT/job
+ state=JOBS[job]
+ try:
+  state.update(status="running",progress="Preparing voice")
+  audio=voicepath or folder/"voice.mp3"
+  if voicepath is None:await tts(script,audio)
+  total=duration(audio)
+  if total<0.5:raise ValueError("Audio too short")
+  if total>7200:raise ValueError("Export currently limited to 120 minutes")
+  each=total/len(clips)
+  rendered=[]
+  for i,clip in enumerate(clips):
+   state["progress"]=f"Encoding scene {i+1}/{len(clips)}"
+   out=folder/f"scene{i}.mp4"
+   await asyncio.to_thread(run,["ffmpeg","-y","-stream_loop","-1","-i",str(clip),"-t",str(each),"-vf","scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2,setsar=1","-r","24","-an","-c:v","libx264","-threads","2","-preset","ultrafast","-crf","30",str(out)])
+   rendered.append(out)
+  listing=folder/"concat.txt"
+  listing.write_text("".join("file '"+p.name+"'\n" for p in rendered))
+  silent=folder/"silent.mp4"
+  state["progress"]="Combining scenes"
+  await asyncio.to_thread(run,["ffmpeg","-y","-f","concat","-safe","0","-i",str(listing),"-c","copy",str(silent)])
+  lines=[x.strip() for x in script.splitlines() if x.strip()]
+  if not lines:lines=[" "]
+  step=total/len(lines)
+  srt=folder/"captions.srt"
+  srt.write_text("".join(f"{i+1}\n{stamp(i*step)} --> {stamp(min(total,(i+1)*step))}\n{line}\n\n" for i,line in enumerate(lines)),encoding="utf-8")
+  final=folder/"documentary.mp4"
+  state["progress"]="Finalizing MP4 and audio"
+  if musicpath:
+   cmd=["ffmpeg","-y","-i",str(silent),"-i",str(audio),"-stream_loop","-1","-i",str(musicpath),"-filter_complex","[1:a]volume=1[a];[2:a]volume=0.08[b];[a][b]amix=inputs=2:duration=first[m]","-map","0:v","-map","[m]","-t",str(total),"-c:v","copy","-c:a","aac",str(final)]
+  else:
+   cmd=["ffmpeg","-y","-i",str(silent),"-i",str(audio),"-t",str(total),"-c:v","copy","-c:a","aac",str(final)]
+  await asyncio.to_thread(run,cmd)
+  state.update(status="done",progress="Ready",mp4=f"/download/{job}/documentary.mp4",srt=f"/download/{job}/captions.srt")
+ except Exception as exc:
+  state.update(status="failed",error=str(exc)[:250],progress="Failed")
+
+@app.get("/render-status/{job}")
+def render_status(job:str):
+ if not (len(job)==32 and all(c in "0123456789abcdef" for c in job)):raise HTTPException(404)
+ state=JOBS.get(job)
+ if not state:raise HTTPException(404,"Job not found (server may have restarted)")
+ return state
+
 @app.get("/download/{job}/{filename}")
 def download(job:str,filename:str):
  if not (len(job)==32 and all(c in "0123456789abcdef" for c in job)) or filename not in ("documentary.mp4","captions.srt"):raise HTTPException(404)
