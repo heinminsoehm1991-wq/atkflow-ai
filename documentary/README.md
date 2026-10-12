@@ -1,0 +1,3 @@
+# ATK AI Documentary Studio — isolated browser MVP
+
+Deploy via Render Docker using Dockerfile path `documentary/Dockerfile`, Docker context `.`. Configure `ATK_PASSWORD` as a secret environment variable. This is a trial with 120-second output cap, 12 clips maximum, 70MB per file. Uses Edge TTS service (availability and commercial terms not guaranteed). FFmpeg renders 1080p; subtitle SRT is downloaded separately (not burned into video). Scene timing is equal-duration, not semantic AI. Render's ephemeral filesystem means downloads disappear on restart. The current synchronous render can time out on free hosting. Do not deploy to paid plan without approval.
