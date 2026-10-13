@@ -23,11 +23,19 @@ const authorized=req=>{
  return a.length===b.length&&timingSafeEqual(a,b);
 };
 const auth=(req,res,next)=>authorized(req)?next():res.status(401).json({error:'Admin token required'});
+function providerFailure(res,e,stage){
+ const status=Number(e.status||e.statusCode)||502;
+ let detail=String(e.body?.detail||e.body?.message||e.message||'Unknown provider error');
+ for(const key of [process.env.FAL_KEY,process.env.ADMIN_TOKEN])if(key)detail=detail.split(key).join('[redacted]');
+ detail=detail.replace(/https?:\/\/\S+/g,'[provider URL]').slice(0,350);
+ console.error(JSON.stringify({event:'fal_request_failed',stage,status,detail}));
+ res.status(502).json({error:'AI provider request failed',providerStatus:status,detail});
+}
 app.use(express.static(path.join(path.dirname(fileURLToPath(import.meta.url)),'public')));
 app.get('/api/health',(_,res)=>res.json({ok:true,configured:!!process.env.FAL_KEY,imageModel:validModel(process.env.SCENE_IMAGE_MODEL_ID),videoModel:validModel(process.env.SCENE_VIDEO_MODEL_ID),adminConfigured:!!process.env.ADMIN_TOKEN}));
 app.get('/api/models',(_,res)=>res.json({models,defaults:{image:models.image.includes(process.env.SCENE_IMAGE_MODEL_ID)?process.env.SCENE_IMAGE_MODEL_ID:models.image[0],video:models.video.includes(process.env.SCENE_VIDEO_MODEL_ID)?process.env.SCENE_VIDEO_MODEL_ID:models.video[0]}}));
 app.post('/api/prompts',auth,async(req,res)=>{
- try{if(!process.env.FAL_KEY)return res.status(503).json({error:'FAL_KEY not configured'});if(req.body.costApproved!==true)return res.status(400).json({error:'Approve fal.ai charges first'});const count=Number(req.body.count),brief=String(req.body.brief||'').trim().slice(0,2000);if(!Number.isInteger(count)||count<1||count>60||!brief)return res.status(400).json({error:'Brief and 1–60 scenes per prompt batch required'});fal.config({credentials:process.env.FAL_KEY});const job=await fal.queue.submit('openrouter/router',{input:{model:process.env.PROMPT_MODEL_ID||'google/gemini-2.5-flash',prompt:`Create exactly ${count} distinct, coherent product advertisement scene prompts based on this brief: ${brief}. This batch starts at scene ${Math.max(1,Number(req.body.start)||1)} of ${Math.max(count,Math.min(720,Number(req.body.total)||count))} total scenes. Product reference is image 1; optional character is image 2. Preserve product and character identity. Include camera, setting, lighting and motion. Return only a JSON array of ${count} strings, no markdown.`,max_tokens:Math.min(16000,count*120),enable_web_search:false}});const id=randomUUID();jobs.set(id,{model:'openrouter/router',requestId:job.request_id,createdAt:Date.now()});res.json({jobId:id})}catch(e){res.status(502).json({error:'AI prompt request failed'})}
+ try{if(!process.env.FAL_KEY)return res.status(503).json({error:'FAL_KEY not configured'});if(req.body.costApproved!==true)return res.status(400).json({error:'Approve fal.ai charges first'});const count=Number(req.body.count),brief=String(req.body.brief||'').trim().slice(0,2000);if(!Number.isInteger(count)||count<1||count>60||!brief)return res.status(400).json({error:'Brief and 1–60 scenes per prompt batch required'});fal.config({credentials:process.env.FAL_KEY});const job=await fal.queue.submit('openrouter/router',{input:{model:process.env.PROMPT_MODEL_ID||'google/gemini-2.5-flash',prompt:`Create exactly ${count} distinct, coherent product advertisement scene prompts based on this brief: ${brief}. This batch starts at scene ${Math.max(1,Number(req.body.start)||1)} of ${Math.max(count,Math.min(720,Number(req.body.total)||count))} total scenes. Product reference is image 1; optional character is image 2. Preserve product and character identity. Include camera, setting, lighting and motion. Return only a JSON array of ${count} strings, no markdown.`,max_tokens:Math.min(16000,count*120),enable_web_search:false}});const id=randomUUID();jobs.set(id,{model:'openrouter/router',requestId:job.request_id,createdAt:Date.now()});res.json({jobId:id})}catch(e){providerFailure(res,e,'prompts')}
 });
 app.post('/api/generate',auth,upload.fields([{name:'image',maxCount:1},{name:'character',maxCount:1}]),async(req,res)=>{
  try{
@@ -53,7 +61,7 @@ app.post('/api/generate',auth,upload.fields([{name:'image',maxCount:1},{name:'ch
   const id=randomUUID();
   jobs.set(id,{model,requestId:job.request_id,createdAt:Date.now()});
   res.json({jobId:id,status:'IN_QUEUE'});
- }catch(e){res.status(502).json({error:'AI provider request failed',detail:String(e.message||e).slice(0,200)})}
+ }catch(e){providerFailure(res,e,'generation')}
 });
 app.get('/api/jobs/:id',auth,async(req,res)=>{
  const j=jobs.get(req.params.id);
