@@ -1,5 +1,7 @@
 import 'dotenv/config';
 import express from 'express';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import multer from 'multer';
 import { randomUUID, timingSafeEqual } from 'node:crypto';
 import { fal } from '@fal-ai/client';
@@ -17,7 +19,7 @@ const authorized=req=>{
  return a.length===b.length&&timingSafeEqual(a,b);
 };
 const auth=(req,res,next)=>authorized(req)?next():res.status(401).json({error:'Admin token required'});
-app.get('/',(_,res)=>res.type('text/plain').send('ATK AI FLOW API — /api/health'));
+app.use(express.static(path.join(path.dirname(fileURLToPath(import.meta.url)),'public')));
 app.get('/api/health',(_,res)=>res.json({ok:true,configured:!!process.env.FAL_KEY,imageModel:validModel(process.env.SCENE_IMAGE_MODEL_ID),videoModel:validModel(process.env.SCENE_VIDEO_MODEL_ID),adminConfigured:!!process.env.ADMIN_TOKEN}));
 app.post('/api/generate',auth,upload.single('image'),async(req,res)=>{
  try{
