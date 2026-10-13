@@ -14,3 +14,29 @@ Connected product → prompt → image → video → final graph. Scene chains c
 POST /api/render accepts completed video job IDs, not arbitrary URLs. Server verifies target total, serializes renders, and provides authenticated status/download endpoints. Completed outputs expire after 1 hour. Provider job metadata lives in memory and is lost on server restart; browser layouts persist but saved output URLs cannot be used as authenticated jobs after restart. This is a single-admin beta, not durable multi-user hosting.
 
 Tests: `npm test` (schemas, duration validation, actual mixed-resolution MP4 merge).
+
+
+## Direct Google Gemini provider
+
+The editor defaults to `google/gemini-2.5-flash-image` for images and
+`google/veo-3.1-fast-generate-preview` for video. Add `GEMINI_API_KEY` to
+the existing **atk-ai-flow-backend** Render service, alongside its existing
+`ADMIN_TOKEN`. Keys stay on the server. No fal balance is needed for Google
+models. `GEMINI_PROMPT_MODEL` optionally overrides `gemini-2.5-flash`.
+
+Use **Check Gemini key (no generation)** after entering the Admin token.
+This checks model visibility, not billing eligibility. Google image and video
+generation require appropriate model access and billing. Veo supports 16:9
+and 9:16, with 4/6/8-second generated clips. Five-second scenes generate six
+seconds and are trimmed by the renderer, so billable duration can exceed
+final duration. Veo's audio is removed by the existing silent MP4 renderer.
+
+Google outputs are downloaded server-side and expire after 24 hours or a
+server restart. Media links use unguessable job IDs; treat them as private
+share links. Final MP4 download expires after one hour. Google model versions
+can retire; check Google's model deprecation page and update the allowlist
+when moving to a replacement. fal models remain optional, explicitly selected.
+
+Validation: `npm test` includes mocked Google reference inputs, provider
+failures and download behavior, plus real FFmpeg merge/duration checks.
+Mock tests do not establish live Google generation or billing access.
