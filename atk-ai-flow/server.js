@@ -8,6 +8,7 @@ import { models, modelInput } from './models.js';
 import { binary, validateClips, mergeClips } from './render.js';
 import { access, rm, mkdir, writeFile } from 'node:fs/promises';
 import os from 'node:os';
+import {googleNarration,overlayNarration} from './narration.js';
 import {isGoogle,makeGoogle,imageRequest,videoRequest,googlePrompt,googleImage,googleVideo} from './gemini.js';
 import { fal } from '@fal-ai/client';
 const app=express();
@@ -67,9 +68,9 @@ app.post('/api/generate',auth,upload.fields([{name:'image',maxCount:1},{name:'ch
   if(!prompt)return res.status(400).json({error:'Prompt required'});
   if(isGoogle(model)){
    const ai=makeGoogle();
-   const dialogue=String(req.body.dialogue||'').trim().slice(0,500);const videoPrompt=dialogue?prompt+'\nAudio instruction: The adult presenter speaks Burmese (Myanmar language), clearly and naturally, saying exactly '+JSON.stringify(dialogue)+'. No English speech, no subtitles. Start speaking immediately and finish the whole line within '+Math.max(1,seconds-1)+' seconds, before the scene ends. Keep music quiet.':prompt;
+   const dialogue=String(req.body.dialogue||'').trim().slice(0,500);const tts=req.body.speechMode==='tts';const videoPrompt=dialogue&&!tts?prompt+'\nAudio instruction: The adult presenter speaks Burmese (Myanmar language), clearly and naturally, saying exactly '+JSON.stringify(dialogue)+'. No English speech, no subtitles. Start speaking immediately and finish the whole line within '+Math.max(1,seconds-1)+' seconds, before the scene ends. Keep music quiet.':(tts&&dialogue?prompt+'\nNo spoken dialogue or music; a Burmese voiceover will be added separately.':prompt);
    const request=kind==='image'?imageRequest(model,prompt,req.file,character,req.body.ratio||'16:9'):videoRequest(model,videoPrompt,req.file,seconds,req.body.ratio||'16:9');
-   const id=startGoogle(model,kind,async(j,id)=>{await mkdir(mediaRoot,{recursive:true});j.outputPath=path.join(mediaRoot,id+(kind==='image'?'.png':'.mp4'));if(kind==='image'){const output=await googleImage(ai,request);j.mime=output.mime;await writeFile(j.outputPath,output.buffer)}else{j.mime='video/mp4';await googleVideo(ai,request,j.outputPath)}j.outputUrl='/api/media/'+id;return kind==='image'?{images:[{url:j.outputUrl}]}:{video:{url:j.outputUrl}}});
+   const id=startGoogle(model,kind,async(j,id)=>{await mkdir(mediaRoot,{recursive:true});j.outputPath=path.join(mediaRoot,id+(kind==='image'?'.png':'.mp4'));if(kind==='image'){const output=await googleImage(ai,request);j.mime=output.mime;await writeFile(j.outputPath,output.buffer)}else{j.mime='video/mp4';await googleVideo(ai,request,j.outputPath);if(tts&&dialogue)await overlayNarration(j.outputPath,await googleNarration(dialogue,req.body.voice||'Charon'),seconds)}j.outputUrl='/api/media/'+id;return kind==='image'?{images:[{url:j.outputUrl}]}:{video:{url:j.outputUrl}}});
    return res.json({jobId:id,status:'IN_QUEUE'});
   }
   if(!process.env.FAL_KEY)return res.status(503).json({error:'FAL_KEY not configured'});

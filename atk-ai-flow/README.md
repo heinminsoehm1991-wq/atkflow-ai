@@ -40,3 +40,12 @@ when moving to a replacement. fal models remain optional, explicitly selected.
 Validation: `npm test` includes mocked Google reference inputs, provider
 failures and download behavior, plus real FFmpeg merge/duration checks.
 Mock tests do not establish live Google generation or billing access.
+
+
+Burmese speech: Native Veo speech may vary in pronunciation and wording. The
+optional Gemini TTS mode uses `gemini-3.8-flash-tts` with Charon or Kore to
+create a separate Burmese voiceover, then replaces the clip soundtrack. This
+is an additional billable Google API operation and is explicitly disclosed
+in the generation confirmation. The renderer fits modestly longer speech to
+the selected duration without changing pitch; scripts longer than 1.8 times
+the scene duration are rejected. Voiceover does not guarantee lip sync.
