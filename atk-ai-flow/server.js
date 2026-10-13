@@ -67,7 +67,8 @@ app.post('/api/generate',auth,upload.fields([{name:'image',maxCount:1},{name:'ch
   if(!prompt)return res.status(400).json({error:'Prompt required'});
   if(isGoogle(model)){
    const ai=makeGoogle();
-   const request=kind==='image'?imageRequest(model,prompt,req.file,character,req.body.ratio||'16:9'):videoRequest(model,prompt,req.file,seconds,req.body.ratio||'16:9');
+   const dialogue=String(req.body.dialogue||'').trim().slice(0,500);const videoPrompt=dialogue?prompt+'\nAudio instruction: The adult presenter speaks Burmese (Myanmar language), clearly and naturally, saying exactly '+JSON.stringify(dialogue)+'. No English speech, no subtitles. Start speaking immediately and finish the whole line within '+Math.max(1,seconds-1)+' seconds, before the scene ends. Keep music quiet.':prompt;
+   const request=kind==='image'?imageRequest(model,prompt,req.file,character,req.body.ratio||'16:9'):videoRequest(model,videoPrompt,req.file,seconds,req.body.ratio||'16:9');
    const id=startGoogle(model,kind,async(j,id)=>{await mkdir(mediaRoot,{recursive:true});j.outputPath=path.join(mediaRoot,id+(kind==='image'?'.png':'.mp4'));if(kind==='image'){const output=await googleImage(ai,request);j.mime=output.mime;await writeFile(j.outputPath,output.buffer)}else{j.mime='video/mp4';await googleVideo(ai,request,j.outputPath)}j.outputUrl='/api/media/'+id;return kind==='image'?{images:[{url:j.outputUrl}]}:{video:{url:j.outputUrl}}});
    return res.json({jobId:id,status:'IN_QUEUE'});
   }

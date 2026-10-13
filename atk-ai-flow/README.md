@@ -29,7 +29,7 @@ This checks model visibility, not billing eligibility. Google image and video
 generation require appropriate model access and billing. Veo supports 16:9
 and 9:16, with 4/6/8-second generated clips. Five-second scenes generate six
 seconds and are trimmed by the renderer, so billable duration can exceed
-final duration. Veo's audio is removed by the existing silent MP4 renderer.
+final duration. The renderer preserves Veo's audio and adds silent audio only for clips without a soundtrack. Enter Burmese dialogue in the prompt node to request Myanmar speech from Veo; pronunciation and exact wording require reviewing the generated clip.
 
 Google outputs are downloaded server-side and expire after 24 hours or a
 server restart. Media links use unguessable job IDs; treat them as private
