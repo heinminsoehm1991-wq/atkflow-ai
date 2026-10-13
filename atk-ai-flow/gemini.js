@@ -1,5 +1,5 @@
 import { GoogleGenAI } from '@google/genai';
-export const googleModels={image:['google/gemini-2.5-flash-image','google/gemini-3.1-flash-image'],video:['google/veo-3.1-fast-generate-preview','google/veo-3.1-generate-preview']};
+export const googleModels={image:['google/gemini-3.1-flash-image'],video:['google/veo-3.1-fast-generate-preview','google/veo-3.1-generate-preview']};
 export const isGoogle=model=>model?.startsWith('google/');
 export function veoDuration(seconds){if(seconds>8)throw Error('Veo scenes must be 1–8 seconds');return seconds<=4?4:seconds<=6?6:8}
 export function imageRequest(model,prompt,image,character,ratio){

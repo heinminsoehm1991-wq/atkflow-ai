@@ -18,7 +18,7 @@ Tests: `npm test` (schemas, duration validation, actual mixed-resolution MP4 mer
 
 ## Direct Google Gemini provider
 
-The editor defaults to `google/gemini-2.5-flash-image` for images and
+The editor defaults to `google/gemini-3.1-flash-image` for images and
 `google/veo-3.1-fast-generate-preview` for video. Add `GEMINI_API_KEY` to
 the existing **atk-ai-flow-backend** Render service, alongside its existing
 `ADMIN_TOKEN`. Keys stay on the server. No fal balance is needed for Google
