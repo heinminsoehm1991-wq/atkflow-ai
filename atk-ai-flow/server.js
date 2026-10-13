@@ -38,7 +38,11 @@ function providerFailure(res,e,stage){
  res.status(502).json({error:'AI provider request failed',providerStatus:status,detail});
 }
 app.use(express.static(path.join(path.dirname(fileURLToPath(import.meta.url)),'public')));
-app.get('/api/health',(_,res)=>res.json({ok:true,provider:'Gemini',configured:!!process.env.GEMINI_API_KEY,imageModel:true,videoModel:true,adminConfigured:!!process.env.ADMIN_TOKEN}));
+let googleHealthCheck;
+async function verifyGoogleAccess(){
+ if(!googleHealthCheck||Date.now()>googleHealthCheck.expires){googleHealthCheck={expires:Date.now()+60000,promise:(async()=>{try{const ai=makeGoogle(),names=[];for await(const m of await ai.models.list({config:{pageSize:100}}))names.push(m.name?.replace('models/',''));return {keyValid:true,prompt:names.includes(process.env.GEMINI_PROMPT_MODEL||'gemini-2.5-flash'),image:names.includes('gemini-2.5-flash-image'),video:names.includes('veo-3.1-fast-generate-preview'),generationTested:false,billingVerified:false}}catch(e){return {keyValid:false,status:Number(e.status||e.statusCode)||502,generationTested:false,billingVerified:false}}})()}}return googleHealthCheck.promise;
+}
+app.get('/api/health',async(req,res)=>res.json({ok:true,provider:'Gemini',configured:!!process.env.GEMINI_API_KEY,imageModel:true,videoModel:true,adminConfigured:!!process.env.ADMIN_TOKEN,...(req.query.verify==='1'?{connection:await verifyGoogleAccess()}:{})}));
 app.get('/api/models',(_,res)=>res.json({models,defaults:{image:models.image[0],video:models.video[0]}}));
 app.get('/api/connection',auth,async(req,res)=>{try{const ai=makeGoogle();const available=[];for await(const m of await ai.models.list({config:{pageSize:100}}))available.push(m.name?.replace('models/',''));res.json({ok:true,provider:'Gemini',image:available.filter(m=>models.image.some(s=>s==='google/'+m)),video:available.filter(m=>models.video.some(s=>s==='google/'+m)),prompt:available.includes(process.env.GEMINI_PROMPT_MODEL||'gemini-2.5-flash'),billingVerified:false})}catch(e){providerFailure(res,e,'connection')}});
 app.get('/api/media/:id',(req,res)=>{const j=jobs.get(req.params.id);if(j?.status!=='COMPLETED'||!j.outputPath)return res.status(404).end();res.set('Cache-Control','private, max-age=300');res.type(j.mime).sendFile(j.outputPath)});
