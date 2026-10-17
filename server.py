@@ -135,11 +135,11 @@ class Handler(BaseHTTPRequestHandler):
                         "p=json.load(sys.stdin);"
                         "asyncio.run(edge_tts.Communicate(p['text'],p['voice'],"
                         "rate=f\"{p['rate']:+d}%\",pitch=f\"{p['pitch']:+d}Hz\","
-                        "boundary='WordBoundary').save(sys.argv[1],sys.argv[2]))"
+                        "boundary=p['boundary']).save(sys.argv[1],sys.argv[2]))"
                     )
                     result = subprocess.run(
                         [sys.executable, "-c", script, target, metadata],
-                        input=json.dumps({"text": text, "voice": voice, "rate": rate, "pitch": pitch}).encode(),
+                        input=json.dumps({"text": text, "voice": voice, "rate": rate, "pitch": pitch, "boundary": "SentenceBoundary" if payload.get("timed") == "sentence" else "WordBoundary"}).encode(),
                         stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, timeout=150)
                 else:
                     result = subprocess.run(
@@ -154,13 +154,13 @@ class Handler(BaseHTTPRequestHandler):
                     words = []
                     for line in Path(metadata).read_text(encoding="utf-8").splitlines():
                         item = json.loads(line)
-                        if item.get("type") == "WordBoundary":
+                        if item.get("type") in ("WordBoundary", "SentenceBoundary"):
                             words.append({"text": item["text"], "start": item["offset"] / 10000000,
                                           "end": (item["offset"] + item["duration"]) / 10000000})
                     if not words:
                         return self.reply(502, "Voice provider returned no word timings")
                     data = json.dumps({"audio": base64.b64encode(data).decode(), "words": words,
-                                       "voice": voice, "rate": rate, "pitch": pitch}).encode()
+                                       "voice": voice, "rate": rate, "pitch": pitch, "boundary": "sentence" if payload.get("timed") == "sentence" else "word"}).encode()
                     content_type = "application/json"
                 self.send_response(200)
                 self.send_header("Content-Type", content_type)
