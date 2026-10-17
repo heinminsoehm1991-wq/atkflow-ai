@@ -1,6 +1,7 @@
 """Private, single-purpose TikTok importer for ATK's authenticated Site route."""
 
 import hmac
+import base64
 import json
 import os
 import re
@@ -127,15 +128,42 @@ class Handler(BaseHTTPRequestHandler):
         try:
             with tempfile.TemporaryDirectory(prefix="atk-voice-") as directory:
                 target = str(Path(directory) / "voice.mp3")
-                result = subprocess.run(
-                    ["python", "-m", "edge_tts", "--voice", voice, f"--rate={rate:+d}%", f"--pitch={pitch:+d}Hz",
-                     "--text", text, "--write-media", target],
-                    stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, timeout=150)
+                metadata = str(Path(directory) / "words.jsonl")
+                if payload.get("timed"):
+                    script = (
+                        "import asyncio,json,sys,edge_tts;"
+                        "p=json.load(sys.stdin);"
+                        "asyncio.run(edge_tts.Communicate(p['text'],p['voice'],"
+                        "rate=f\"{p['rate']:+d}%\",pitch=f\"{p['pitch']:+d}Hz\","
+                        "boundary='WordBoundary').save(sys.argv[1],sys.argv[2]))"
+                    )
+                    result = subprocess.run(
+                        [sys.executable, "-c", script, target, metadata],
+                        input=json.dumps({"text": text, "voice": voice, "rate": rate, "pitch": pitch}).encode(),
+                        stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, timeout=150)
+                else:
+                    result = subprocess.run(
+                        [sys.executable, "-m", "edge_tts", "--voice", voice, f"--rate={rate:+d}%", f"--pitch={pitch:+d}Hz",
+                         "--text", text, "--write-media", target],
+                        stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, timeout=150)
                 if result.returncode or not Path(target).is_file():
                     return self.reply(502, "Microsoft voice service could not generate audio")
                 data = Path(target).read_bytes()
+                content_type = "audio/mpeg"
+                if payload.get("timed"):
+                    words = []
+                    for line in Path(metadata).read_text(encoding="utf-8").splitlines():
+                        item = json.loads(line)
+                        if item.get("type") == "WordBoundary":
+                            words.append({"text": item["text"], "start": item["offset"] / 10000000,
+                                          "end": (item["offset"] + item["duration"]) / 10000000})
+                    if not words:
+                        return self.reply(502, "Voice provider returned no word timings")
+                    data = json.dumps({"audio": base64.b64encode(data).decode(), "words": words,
+                                       "voice": voice, "rate": rate, "pitch": pitch}).encode()
+                    content_type = "application/json"
                 self.send_response(200)
-                self.send_header("Content-Type", "audio/mpeg")
+                self.send_header("Content-Type", content_type)
                 self.send_header("Content-Length", str(len(data)))
                 self.send_header("Cache-Control", "private, no-store")
                 self.end_headers()
