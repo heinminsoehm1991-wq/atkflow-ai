@@ -125,7 +125,7 @@ class Handler(BaseHTTPRequestHandler):
             with tempfile.TemporaryDirectory(prefix="atk-voice-") as directory:
                 target = str(Path(directory) / "voice.mp3")
                 result = subprocess.run(
-                    ["python", "-m", "edge_tts", "--voice", voice, "--rate", f"{rate:+d}%",
+                    ["python", "-m", "edge_tts", "--voice", voice, f"--rate={rate:+d}%",
                      "--text", text, "--write-media", target],
                     stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, timeout=150)
                 if result.returncode or not Path(target).is_file():
