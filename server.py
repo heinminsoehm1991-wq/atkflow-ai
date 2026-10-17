@@ -79,15 +79,15 @@ class Handler(BaseHTTPRequestHandler):
                     result = subprocess.run(command, stdout=subprocess.DEVNULL,
                                             stderr=subprocess.PIPE, text=True, timeout=150, check=False)
                 except subprocess.TimeoutExpired:
-                    return self.reply(504, "TikTok download timed out")
+                    return self.reply(504, "Video download timed out")
                 if result.returncode != 0:
                     diagnostic = re.sub(r"https?://[^\s]+", "[URL]", result.stderr or "")
                     diagnostic = diagnostic.replace(secret, "[REDACTED]").replace(secondary, "[REDACTED]")[-4000:]
                     print("ATK_IMPORT_FAILED: " + diagnostic, file=sys.stderr, flush=True)
-                    return self.reply(422, "TikTok video unavailable for import")
+                    return self.reply(422, ("The video host requires human verification. Upload the video file directly." if "not a bot" in (result.stderr or "").lower() else "Video unavailable for import"))
                 videos = list(Path(directory).glob("video.mp4"))
                 if not videos:
-                    return self.reply(422, "TikTok did not provide an MP4")
+                    return self.reply(422, "The video host did not provide an MP4")
                 video = videos[0]
                 size = video.stat().st_size
                 if not 0 < size <= MAX_BYTES:
@@ -115,6 +115,9 @@ class Handler(BaseHTTPRequestHandler):
             return self.reply(400, "Enter 1–20000 characters")
         try:
             rate = int(payload.get("rate", 0))
+            pitch = int(payload.get("pitch", 0))
+            if not -100 <= pitch <= 100:
+                raise ValueError()
             if not -50 <= rate <= 100:
                 raise ValueError()
         except (ValueError, TypeError):
@@ -125,7 +128,7 @@ class Handler(BaseHTTPRequestHandler):
             with tempfile.TemporaryDirectory(prefix="atk-voice-") as directory:
                 target = str(Path(directory) / "voice.mp3")
                 result = subprocess.run(
-                    ["python", "-m", "edge_tts", "--voice", voice, f"--rate={rate:+d}%",
+                    ["python", "-m", "edge_tts", "--voice", voice, f"--rate={rate:+d}%", f"--pitch={pitch:+d}Hz",
                      "--text", text, "--write-media", target],
                     stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, timeout=150)
                 if result.returncode or not Path(target).is_file():
