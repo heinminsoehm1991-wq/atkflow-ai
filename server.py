@@ -109,8 +109,8 @@ class Handler(BaseHTTPRequestHandler):
     def speech(self, payload):
         text = payload.get("text")
         voice = payload.get("voice", "my-MM-ThihaNeural")
-        if voice not in ("my-MM-ThihaNeural", "my-MM-NilarNeural"):
-            return self.reply(400, "Choose Thiha or Nilar")
+        if not isinstance(voice, str) or not re.fullmatch(r"(?:my-MM-(?:Thiha|Nilar)|th-TH-(?:Niwat|Premwadee)|en-(?:US|AU|CA|HK|IN|IE|KE|NZ|NG|PH|SG|ZA|TZ|GB)-[A-Za-z]+)Neural", voice):
+            return self.reply(400, "Choose a supported Myanmar, Thai, or English voice")
         if not isinstance(text, str) or not text.strip() or len(text) > 20000:
             return self.reply(400, "Enter 1–20000 characters")
         try:
