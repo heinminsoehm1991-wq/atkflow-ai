@@ -1,5 +1,8 @@
 """Private, single-purpose TikTok importer for ATK's authenticated Site route."""
 
+import render_jobs
+import signal
+import threading
 import hmac
 import base64
 import json
@@ -45,7 +48,7 @@ class Handler(BaseHTTPRequestHandler):
         return self.reply(200, "ok")
 
     def do_POST(self):
-        if self.path not in ("/import", "/tts"):
+        if self.path not in ("/import", "/tts", "/render-job"):
             return self.reply(404, "Not found")
         secret = os.environ.get("ATK_IMPORT_TOKEN", "")
         supplied = self.headers.get("Authorization", "")
@@ -60,6 +63,9 @@ class Handler(BaseHTTPRequestHandler):
             return self.reply(413, "Invalid request size")
         try:
             payload = json.loads(self.rfile.read(length))
+            if self.path == "/render-job":
+                code, message = render_jobs.accept(payload)
+                return self.reply(code, message)
             if self.path == "/tts":
                 return self.speech(payload)
             url = payload["url"]
@@ -177,5 +183,16 @@ class Handler(BaseHTTPRequestHandler):
 
 
 if __name__ == "__main__":
+    render_jobs.start()
     port = int(os.environ.get("PORT", "8000"))
-    ThreadingHTTPServer(("0.0.0.0", port), Handler).serve_forever()
+    server = ThreadingHTTPServer(("0.0.0.0", port), Handler)
+    def shutdown(signum, frame):
+        render_jobs.STOP.set()
+        threading.Thread(target=server.shutdown, daemon=True).start()
+    signal.signal(signal.SIGTERM, shutdown)
+    signal.signal(signal.SIGINT, shutdown)
+    try:
+        server.serve_forever()
+    finally:
+        server.server_close()
+
