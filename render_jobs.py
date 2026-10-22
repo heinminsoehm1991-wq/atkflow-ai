@@ -121,18 +121,25 @@ def run(payload):
    except Exception:pass
  thread=threading.Thread(target=heartbeat,daemon=True);thread.start()
  try:
+  print('ATK_RENDER '+payload['id']+' phase=manifest',flush=True)
   manifest=api(base,token,'manifest')
+  print('ATK_RENDER '+payload['id']+' phase=inputs',flush=True)
   with tempfile.TemporaryDirectory(prefix='atk-render-') as name:
    folder=Path(name)
    for kind,key,target in [('source','sourceParts','source.mp4'),('overlay','overlayParts','overlays.tar')]:
     with open(folder/target,'wb') as combined:
      for i in range(manifest['job'][key]):
+      print('ATK_RENDER '+payload['id']+' downloading='+kind+'/'+str(i),flush=True)
       part=folder/'part.tmp';download(base,token,kind+'/'+str(i),part)
+      print('ATK_RENDER '+payload['id']+' received='+str(part.stat().st_size),flush=True)
       with open(part,'rb') as f:
        while block:=f.read(1024*1024):combined.write(block)
       part.unlink()
+   print('ATK_RENDER '+payload['id']+' downloading=voice',flush=True)
    download(base,token,'voice',folder/'voice.wav')
+   print('ATK_RENDER '+payload['id']+' phase=encoding',flush=True)
    target,quality=render_file(folder,manifest)
+   print('ATK_RENDER '+payload['id']+' phase=upload_result',flush=True)
    meta=api(base,token,'result/start',{'size':target.stat().st_size,'duration':quality['duration'],'name':'ATK-Recap-'+payload['id'][:8]+'.mp4'})
    with open(target,'rb') as f:
     for i in range(meta['parts']):
@@ -146,6 +153,7 @@ def run(payload):
        time.sleep(1)
    api(base,token,'result/commit',{})
  except Exception as error:
+  print('ATK_RENDER '+payload['id']+' failed='+type(error).__name__+' '+str(error)[:220],flush=True)
   if not STOP.is_set():
    try:api(base,token,'failed',{'error':str(error)[:220]})
    except Exception:pass
