@@ -119,7 +119,7 @@ def render_file(folder,manifest):
   if rms(ref,rr,cue['start'],cue['end'])>.0001 and rms(audio,ar,cue['start'],cue['end'])<.0001:raise ValueError('A voice line is missing')
  return target,{'lines':len(manifest['cues']),'duration':seconds,'frames':frames}
 
-def run(payload):
+def run(payload, *, release_slot=True, raise_errors=False):
  base=payload['origin']+'/render-worker/'+payload['id'];token=payload['token'];done=threading.Event()
  def heartbeat():
   while not done.wait(30):
@@ -158,15 +158,23 @@ def run(payload):
        if attempt==2:raise
        time.sleep(1)
    api(base,token,'result/commit',{})
+   return quality
  except Exception as error:
   print('ATK_RENDER '+payload['id']+' failed='+type(error).__name__+' '+str(error)[:220],flush=True)
   if not STOP.is_set():
    try:api(base,token,'failed',{'error':str(error)[:220]})
    except Exception:pass
+  if raise_errors:raise
  finally:
   done.set()
   with LOCK:ACTIVE.pop(payload['id'],None)
-  SLOT.release()
+  if release_slot:SLOT.release()
+
+def validate_payload(payload):
+ from urllib.parse import urlsplit
+ if not isinstance(payload,dict) or not re.fullmatch('[a-f0-9-]{36}',str(payload.get('id',''))) or not re.fullmatch('[a-f0-9]{64}',str(payload.get('token',''))):raise ValueError('Invalid render job')
+ u=urlsplit(str(payload.get('origin','')))
+ if u.scheme!='https' or u.hostname not in ALLOWED or u.path or u.query or u.fragment or u.username or u.port not in (None,443):raise ValueError('Invalid callback origin')
 
 def accept(payload):
  from urllib.parse import urlsplit
