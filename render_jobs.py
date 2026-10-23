@@ -187,7 +187,7 @@ def poll_loop():
     break
    except urllib.error.HTTPError as error:
     code='http_'+str(error.code)
-    if code not in reported:print('ATK_RENDER poll='+code,flush=True);reported.add(code)
+    if code not in reported:print('ATK_RENDER poll='+code+' server='+error.headers.get('server','')+' challenge='+error.headers.get('cf-mitigated','none')+' type='+error.headers.get('content-type',''),flush=True);reported.add(code)
     if error.code!=401:break
    except Exception as error:
     code=type(error).__name__
