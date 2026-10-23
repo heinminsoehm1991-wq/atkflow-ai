@@ -2,7 +2,9 @@
 import concurrent.futures, hashlib, json, math, os, re, signal, subprocess, tarfile, tempfile, threading, time, urllib.request, urllib.error, wave
 from pathlib import Path
 
-SLOT=threading.BoundedSemaphore(1)
+try:RENDER_CONCURRENCY=max(1,min(8,int(os.environ.get('RENDER_CONCURRENCY','1'))))
+except ValueError:RENDER_CONCURRENCY=1
+SLOT=threading.BoundedSemaphore(RENDER_CONCURRENCY)
 LOCK=threading.Lock()
 ACTIVE={}
 STOP=threading.Event()
@@ -181,7 +183,7 @@ def poll_loop():
  origin='https://www.atkmoverecap.app'
  reported=set()
  while not STOP.wait(8):
-  with LOCK:busy=bool(ACTIVE)
+  with LOCK:busy=len(ACTIVE)>=RENDER_CONCURRENCY
   if busy:continue
   for token in [os.environ.get('ATK_RECAP_IMPORT_TOKEN',''),os.environ.get('ATK_IMPORT_TOKEN','')]:
    if not token:continue
