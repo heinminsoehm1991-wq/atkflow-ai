@@ -175,6 +175,7 @@ def accept(payload):
 
 def poll_loop():
  origin='https://www.atkmoverecap.app'
+ reported=set()
  while not STOP.wait(8):
   with LOCK:busy=bool(ACTIVE)
   if busy:continue
@@ -182,9 +183,15 @@ def poll_loop():
    if not token:continue
    try:
     with request(origin+'/render-worker',token,'poll',b'{}') as response:response.read()
+    if 'ready' not in reported:print('ATK_RENDER poll=ready',flush=True);reported.add('ready')
     break
    except urllib.error.HTTPError as error:
+    code='http_'+str(error.code)
+    if code not in reported:print('ATK_RENDER poll='+code,flush=True);reported.add(code)
     if error.code!=401:break
-   except Exception:break
+   except Exception as error:
+    code=type(error).__name__
+    if code not in reported:print('ATK_RENDER poll='+code,flush=True);reported.add(code)
+    break
 
 def start():threading.Thread(target=poll_loop,daemon=True).start()
