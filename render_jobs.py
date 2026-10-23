@@ -13,7 +13,11 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
 OPENER=urllib.request.build_opener(NoRedirect())
 
 def request(base,token,path,body=None,method=None):
- req=urllib.request.Request(base+'/'+path,data=body,method=method or ('POST' if body is not None else 'GET'),headers={'Authorization':'Bearer '+token,'Content-Type':'application/json' if body is None or body.startswith(b'{') else 'application/octet-stream'})
+ from urllib.parse import urlsplit
+ headers={'Authorization':'Bearer '+token,'Content-Type':'application/json' if body is None or body.startswith(b'{') else 'application/octet-stream'}
+ service_token=os.environ.get('ATK_SITE_SERVICE_TOKEN','')
+ if service_token and urlsplit(base).scheme=='https' and urlsplit(base).hostname in ALLOWED:headers['OAI-Sites-Authorization']='Bearer '+service_token
+ req=urllib.request.Request(base+'/'+path,data=body,method=method or ('POST' if body is not None else 'GET'),headers=headers)
  return OPENER.open(req,timeout=60)
 def api(base,token,path,data=None):
  with request(base,token,path,None if data is None else json.dumps(data).encode()) as r:return json.load(r)
@@ -188,6 +192,9 @@ def poll_loop():
    except urllib.error.HTTPError as error:
     code='http_'+str(error.code)
     if code not in reported:print('ATK_RENDER poll='+code+' server='+error.headers.get('server','')+' challenge='+error.headers.get('cf-mitigated','none')+' type='+error.headers.get('content-type',''),flush=True);reported.add(code)
+    if error.code==403:
+     print('ATK_RENDER poll=paused_forbidden; authorized site access requires review',flush=True)
+     return
     if error.code!=401:break
    except Exception as error:
     code=type(error).__name__
