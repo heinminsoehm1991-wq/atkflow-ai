@@ -79,6 +79,20 @@ def pcm(path):
 def rms(samples,rate,start,end):
  a=max(0,int(start*rate));b=min(len(samples),math.ceil(end*rate));return math.sqrt(sum(x*x for x in samples[a:b])/(b-a))/32768 if b>a else 0
 
+def verify_audio(folder,voice,target,seconds,cues):
+ # Decode the complete exported AAC and compare speech-energy windows to retained PCM.
+ decoded=folder/'checked.wav';subprocess.run(['ffmpeg','-v','error','-xerror','-i',str(target),'-vn','-ac','1','-ar','8000','-c:a','pcm_s16le','-y',str(decoded)],check=True,timeout=max(120,min(900,seconds)))
+ reference=folder/'reference-8k.wav';subprocess.run(['ffmpeg','-v','error','-i',str(voice),'-vn','-ac','1','-ar','8000','-c:a','pcm_s16le','-y',str(reference)],check=True,timeout=max(120,min(900,seconds)))
+ ref,rr=pcm(reference);audio,ar=pcm(decoded);active=0
+ for n in range(math.ceil(seconds/.2)):
+  t=n*.2;end=min(seconds,t+.2);energy=rms(ref,rr,t,end)
+  if energy<.005:continue
+  active+=1
+  if rms(audio,ar,max(0,t-.04),min(seconds,end+.04))<energy*.025:raise ValueError('Export audio contains missing speech')
+ if not active:raise ValueError('Voice contains no audible speech')
+ for cue in cues:
+  if rms(ref,rr,cue['start'],cue['end'])>.0001 and rms(audio,ar,cue['start'],cue['end'])<.0001:raise ValueError('A voice line is missing')
+
 def render_file(folder,manifest):
  job=manifest['job'];render=manifest['render'];settings=manifest['settings'];source=folder/'source.mp4';voice=folder/'voice.wav'
  digest=hashlib.sha256()
@@ -106,17 +120,7 @@ def render_file(folder,manifest):
   if proc.returncode:raise RuntimeError('Video encoding failed: '+(folder/'ffmpeg.log').read_text()[-300:])
  out=probe(target);v=next(s for s in out['streams'] if s['codec_type']=='video');a=next(s for s in out['streams'] if s['codec_type']=='audio')
  if int(v.get('nb_frames',0))!=frames or abs(float(v['duration'])-frames/30)>.05 or abs(float(a['duration'])-seconds)>.12:raise ValueError('Incomplete output duration')
- # Decode the complete exported AAC and compare speech-energy windows to retained PCM.
- decoded=folder/'checked.wav';subprocess.run(['ffmpeg','-v','error','-xerror','-i',str(target),'-vn','-ac','1','-ar','8000','-c:a','pcm_s16le','-y',str(decoded)],check=True,timeout=max(120,min(900,seconds)))
- ref,rr=pcm(voice);audio,ar=pcm(decoded);active=0
- for n in range(math.ceil(seconds/.2)):
-  t=n*.2;end=min(seconds,t+.2);energy=rms(ref,rr,t,end)
-  if energy<.005:continue
-  active+=1
-  if rms(audio,ar,max(0,t-.04),min(seconds,end+.04))<energy*.025:raise ValueError('Export audio contains missing speech')
- if not active:raise ValueError('Voice contains no audible speech')
- for cue in manifest['cues']:
-  if rms(ref,rr,cue['start'],cue['end'])>.0001 and rms(audio,ar,cue['start'],cue['end'])<.0001:raise ValueError('A voice line is missing')
+ verify_audio(folder,voice,target,seconds,manifest['cues'])
  return target,{'lines':len(manifest['cues']),'duration':seconds,'frames':frames}
 
 def run(payload):
