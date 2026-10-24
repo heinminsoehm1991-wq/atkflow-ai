@@ -102,12 +102,12 @@ def render_file(folder,manifest):
  with open(folder/'ffmpeg.log','wb') as log:
   proc=subprocess.Popen(command,stdout=subprocess.DEVNULL,stderr=log);started=time.time()
   while proc.poll() is None:
-   if STOP.wait(.5) or time.time()-started>1800:proc.terminate();proc.wait(timeout=15);raise RuntimeError('Renderer interrupted; saved inputs can resume')
+   if STOP.wait(.5) or time.time()-started>max(1800,min(14400,seconds*2+600)):proc.terminate();proc.wait(timeout=15);raise RuntimeError('Renderer interrupted; saved inputs can resume')
   if proc.returncode:raise RuntimeError('Video encoding failed: '+(folder/'ffmpeg.log').read_text()[-300:])
  out=probe(target);v=next(s for s in out['streams'] if s['codec_type']=='video');a=next(s for s in out['streams'] if s['codec_type']=='audio')
  if int(v.get('nb_frames',0))!=frames or abs(float(v['duration'])-frames/30)>.05 or abs(float(a['duration'])-seconds)>.12:raise ValueError('Incomplete output duration')
  # Decode the complete exported AAC and compare speech-energy windows to retained PCM.
- decoded=folder/'checked.wav';subprocess.run(['ffmpeg','-v','error','-xerror','-i',str(target),'-vn','-ac','1','-ar','8000','-c:a','pcm_s16le','-y',str(decoded)],check=True,timeout=120)
+ decoded=folder/'checked.wav';subprocess.run(['ffmpeg','-v','error','-xerror','-i',str(target),'-vn','-ac','1','-ar','8000','-c:a','pcm_s16le','-y',str(decoded)],check=True,timeout=max(120,min(900,seconds)))
  ref,rr=pcm(voice);audio,ar=pcm(decoded);active=0
  for n in range(math.ceil(seconds/.2)):
   t=n*.2;end=min(seconds,t+.2);energy=rms(ref,rr,t,end)
