@@ -1,6 +1,7 @@
 """Private, single-purpose TikTok importer for ATK's authenticated Site route."""
 
 import render_jobs
+import prepare_transcript
 import signal
 import threading
 import hmac
@@ -48,7 +49,7 @@ class Handler(BaseHTTPRequestHandler):
         return self.reply(200, "ok")
 
     def do_POST(self):
-        if self.path not in ("/import", "/tts", "/render-job"):
+        if self.path not in ("/import", "/tts", "/render-job", "/prepare-transcript"):
             return self.reply(404, "Not found")
         secret = os.environ.get("ATK_IMPORT_TOKEN", "")
         supplied = self.headers.get("Authorization", "")
@@ -63,6 +64,9 @@ class Handler(BaseHTTPRequestHandler):
             return self.reply(413, "Invalid request size")
         try:
             payload = json.loads(self.rfile.read(length))
+            if self.path == "/prepare-transcript":
+                code, message = prepare_transcript.accept(payload)
+                return self.reply(code, message)
             if self.path == "/render-job":
                 code, message = render_jobs.accept(payload)
                 return self.reply(code, message)
