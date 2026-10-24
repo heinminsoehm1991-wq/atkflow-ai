@@ -5,7 +5,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg \
     && pip install --no-cache-dir --upgrade --pre "yt-dlp[default,curl-cffi]" edge-tts
 
 WORKDIR /app
-COPY server.py render_jobs.py ./
+COPY server.py render_jobs.py prepare_transcript.py ./
 ENV PYTHONUNBUFFERED=1
 CMD ["python", "server.py"]
 
